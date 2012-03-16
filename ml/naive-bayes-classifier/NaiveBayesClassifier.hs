@@ -1,8 +1,9 @@
 module NaiveBayesClassifier (
-  Probability,
+  LogProbability,
   NaiveBayesClassifier(NBC),
   fromTrainer,
-  probability
+  classify,
+  analyze
 ) where
 
 import NaiveBayesTrainer (Counts)
@@ -11,44 +12,66 @@ import qualified NaiveBayesTrainer as NBT
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
 
-type Probability = Double
+import qualified Data.List as List
+
+type LogProbability = Double
 
 data NaiveBayesClassifier c f = NBC {
-    classProbabilities       :: Map c Probability,
-    featureProbabilities     :: Map f Probability,
-    conditionalProbabilities :: Map (f, c) Probability,
-    samples                  :: Counts
+    priorsMap       :: Map c LogProbability,
+    conditionalsMap :: Map (f, c) LogProbability,
+    samples         :: Counts
   } deriving (Eq, Show)
+
+-- constants d will be the default probability for unknown features
+(alpha, d)            = (1.0, 2.0)
 
 empty :: NaiveBayesClassifier c f
 empty = NBC {
-    classProbabilities = Map.empty,
-    featureProbabilities = Map.empty,
-    conditionalProbabilities = Map.empty,
-    samples = 0
+    priorsMap       = Map.empty,
+    conditionalsMap = Map.empty,
+    samples         = 0
   }
 
 fromTrainer :: (Ord c, Ord f) => NBT.NaiveBayesTrainer c f ->
                                  NaiveBayesClassifier c f
 fromTrainer (NBT.NBT classFeatures classCounts) = NBC {
-    classProbabilities       = deriveProbabilities (const s) classCounts,
-    featureProbabilities     = deriveProbabilities (const s) featureCounts,
-    conditionalProbabilities = Map.unions compositeKeyMaps,
-    samples                  = s
+    priorsMap       = logProbabilities (const numSamples) classCounts,
+    conditionalsMap = Map.unions compositeKeyMaps,
+    samples         = numSamples
   }
   where
-    s                = Map.foldl' (+) 0 classCounts
+    numSamples       = Map.foldl' (+) 0 classCounts
     featureCounts    = Map.unionsWith (+) $ Map.elems classFeatures
-    deriveCFProb c   = deriveProbabilities $ const $ classCounts ! c
+    deriveCFProb c   = logProbabilities $ const $ classCounts ! c
     cFProbs          = Map.mapWithKey deriveCFProb classFeatures
-    compositeKeyMaps = Map.elems $ Map.mapWithKey (\k -> appendKey k) cFProbs
+    compositeKeyMaps = Map.elems $ Map.mapWithKey appendKey cFProbs
 
+classify :: (Ord c, Ord f) => NaiveBayesClassifier c f -> [f] -> c
+classify nbc features = (fst . argmax') $ analyze nbc features
+  where
+    -- note this assumes the list has numbers > 0
+    argmax'         = List.foldl1' (\m t -> if snd t > snd m then t else m)
+
+analyze :: (Ord c, Ord f) => NaiveBayesClassifier c f -> [f] -> [(c, LogProbability)]
+analyze nbc features = zip classifications likelihoods
+  where
+    classifications = Map.keys $ priorsMap nbc
+    likelihoods     = map (scoreClass nbc features) classifications
 
 {- Helper Functions -}
-deriveProbabilities :: Ord k => (k -> Counts) -> Map k Counts -> Map k Probability
-deriveProbabilities findTotal = Map.mapWithKey convertToProbability
+scoreClass :: (Ord c, Ord f) => NaiveBayesClassifier c f -> [f] -> c ->
+                                LogProbability
+scoreClass nbc features class_ = List.foldl' (+) prior conditionalScores
   where
-    convertToProbability k c = fromIntegral c / fromIntegral (findTotal k)
+    prior             = priorsMap nbc ! class_
+    conditionalScores = map (\f -> Map.findWithDefault (log (1/d)) (f, class_) (conditionalsMap nbc)) features
+
+logProbabilities :: Ord k => (k -> Counts) -> Map k Counts ->
+                             Map k LogProbability
+logProbabilities findTotal = Map.mapWithKey laplaceSmoothen
+  where
+    laplaceSmoothen k c = log $
+      (fromIntegral c + alpha) / (fromIntegral (findTotal k) + d * alpha)
 
 appendKey :: (Ord k1, Ord k2) => k1 -> Map k2 v -> Map (k2, k1) v
 appendKey k = Map.mapKeys (\k' -> (k', k))
