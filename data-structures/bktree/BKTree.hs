@@ -13,7 +13,7 @@ bkt_add (BKNode ys edges) xs = BKNode ys insert (map insertIntoEdge edges)
 
 
 editDist :: Eq a => [a] -> [a] -> Int
-editDist xs ys = 
+editDist xs ys =
 	let
 		(m,n) = (length xs, length ys)
 		x = array (1,m) (zip [1..] xs)

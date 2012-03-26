@@ -7,11 +7,8 @@ implemented for fun/education/profit.
 Data Structures
 ---------------
 
-### Binary Tree
-* [In Progress]
-
 ### BK-Tree
-* [In Progress]
+* Progress frozen for lack of time
 
 ## Algorithms
 * None
