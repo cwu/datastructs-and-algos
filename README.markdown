@@ -7,16 +7,18 @@ implemented for fun/education/profit.
 Data Structures
 ---------------
 
-### Trees
+### Binary Tree
+* [In Progress]
 
-* Binary Tree [In Progress]
-* BK-Tree [In Progress]
+### BK-Tree
+* [In Progress]
 
-Algorithms
-----------
+## Algorithms
 * None
 
 ML
 --
 
-* Naive Bayes Classification [In Progress]
+### Naive Bayes Classification
+* Finished the naive Bayes trainer and classifier
+* Still in need of a real application
